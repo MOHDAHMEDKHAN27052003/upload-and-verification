@@ -4,13 +4,17 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { MailerService } from './mailer.service.js';
-import { Otp, OtpSchema } from './otp.schema.js';
+import { Otp, OtpSchema } from './schemas/otp.schema.js';
+import { User, UserSchema } from './schemas/user.schema.js';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Otp.name, schema: OtpSchema }]),
+    MongooseModule.forFeature([
+      { name: Otp.name, schema: OtpSchema },
+      { name: User.name, schema: UserSchema },
+    ]),
   ],
   controllers: [AuthController],
   providers: [AuthService, MailerService],
 })
-export class AuthModule {}
+export class AuthModule { }

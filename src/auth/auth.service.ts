@@ -2,39 +2,34 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Otp, OtpDocument } from './otp.schema.js';
 import { MailerService } from './mailer.service.js';
 import * as crypto from 'crypto';
+import { Otp, OtpDocument } from './schemas/otp.schema.js';
+import { User, UserDocument } from './schemas/user.schema.js';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(Otp.name) private otpModel: Model<OtpDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private mailerService: MailerService,
   ) {}
 
   async sendOtp(payload: { email: string }): Promise<{ message: string }> {
-    const { email } = payload;
+    const email = payload.email.toLowerCase().trim();
 
     // 1. Generate a secure 6-digit OTP
     const otp = crypto.randomInt(100000, 999999);
-
     const hashedOtp = this.hashOtp(otp);
 
-    // 2. Save/Update OTP in MongoDB
-    // The "upsert" ensures we overwrite any existing OTP for this email
-    // and the TTL index resets because we are saving a new document/updating it.
+    // 2. Save/Update OTP in MongoDB (upsert resets TTL)
     await this.otpModel.findOneAndUpdate(
       { email },
-      { 
-        email, 
-        hashedOtp, 
-        createdAt: new Date() // Reset TTL timer
-      },
-      { upsert: true, returnDocument: 'after' }
+      { email, hashedOtp, createdAt: new Date() },
+      { upsert: true, returnDocument: 'after' },
     );
 
-    // 3. Send the email via Brevo
+    // 3. Send the email
     await this.mailerService.sendOtpEmail(email, otp);
 
     return { message: 'OTP sent successfully' };
@@ -47,17 +42,17 @@ export class AuthService {
       throw new BadRequestException('Email and OTP are required');
     }
 
-    // 1. Find the OTP record for this email
-    const record = await this.otpModel.findOne({ email: email.toLowerCase().trim() });
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 1. Find the OTP record
+    const record = await this.otpModel.findOne({ email: normalizedEmail });
 
     if (!record) {
       throw new BadRequestException('OTP not found or has expired');
     }
 
-    // 2. Hash the incoming OTP using the same secret and compare
+    // 2. Compare hashed OTP
     const hashedInput = this.hashOtp(otp);
-
-    // Use timingSafeEqual to prevent timing attacks
     const storedBuf = Buffer.from(record.hashedOtp, 'hex');
     const inputBuf = Buffer.from(hashedInput, 'hex');
 
@@ -69,17 +64,25 @@ export class AuthService {
       throw new BadRequestException('Invalid OTP');
     }
 
-    // 3. Delete the OTP so it can't be reused (single-use)
+    // 3. Delete the OTP (single-use)
     await this.otpModel.deleteOne({ _id: record._id });
 
-    // 4. (Optional) Issue a JWT / mark the user verified here
+    // 4. Create user if not exists, otherwise return existing
+    //    - New users default to 'student'
+    //    - Existing users keep their current role (e.g., librarian)
+    await this.userModel.findOneAndUpdate(
+      { email: normalizedEmail },
+      { $setOnInsert: { email: normalizedEmail, role: 'student' } },
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
+    );
+
+    // 5. (Optional) Issue a JWT here using user._id and user.role
+
     return { message: 'OTP verified successfully' };
   }
 
   private hashOtp(otp: number): string {
-    // Use a server-side secret (from env) as a salt
     const secret = process.env.OTP_HASH_SECRET;
-    
     return crypto
       .createHmac('sha256', secret!)
       .update(otp.toString())
