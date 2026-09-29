@@ -1,7 +1,8 @@
 // auth.controller.ts
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
-import { SendOtpDto } from './send-otp.dto.js';
+import { SendOtpDto } from './dto/send-otp.dto.js';
+import { VerifyOtpDto } from './dto/verify-otp.dto.js';
 
 @Controller('auth')
 export class AuthController {
@@ -10,5 +11,11 @@ export class AuthController {
   @Post('send-otp')
   async sendOtp(@Body() sendOtpDto: SendOtpDto) {
     return this.authService.sendOtp(sendOtpDto);
+  }
+
+  @Post('verify-otp')
+  @HttpCode(200)
+  async verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyOtp(dto);
   }
 }

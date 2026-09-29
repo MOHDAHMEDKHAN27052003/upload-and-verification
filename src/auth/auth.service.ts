@@ -1,5 +1,5 @@
 // auth.service.ts
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Otp, OtpDocument } from './otp.schema.js';
@@ -38,6 +38,42 @@ export class AuthService {
     await this.mailerService.sendOtpEmail(email, otp);
 
     return { message: 'OTP sent successfully' };
+  }
+
+  async verifyOtp(payload: { email: string; otp: number }): Promise<{ message: string }> {
+    const { email, otp } = payload;
+
+    if (!email || !otp) {
+      throw new BadRequestException('Email and OTP are required');
+    }
+
+    // 1. Find the OTP record for this email
+    const record = await this.otpModel.findOne({ email: email.toLowerCase().trim() });
+
+    if (!record) {
+      throw new BadRequestException('OTP not found or has expired');
+    }
+
+    // 2. Hash the incoming OTP using the same secret and compare
+    const hashedInput = this.hashOtp(otp);
+
+    // Use timingSafeEqual to prevent timing attacks
+    const storedBuf = Buffer.from(record.hashedOtp, 'hex');
+    const inputBuf = Buffer.from(hashedInput, 'hex');
+
+    const isValid =
+      storedBuf.length === inputBuf.length &&
+      crypto.timingSafeEqual(storedBuf, inputBuf);
+
+    if (!isValid) {
+      throw new BadRequestException('Invalid OTP');
+    }
+
+    // 3. Delete the OTP so it can't be reused (single-use)
+    await this.otpModel.deleteOne({ _id: record._id });
+
+    // 4. (Optional) Issue a JWT / mark the user verified here
+    return { message: 'OTP verified successfully' };
   }
 
   private hashOtp(otp: number): string {
