@@ -1,11 +1,21 @@
 // auth.service.ts
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { JwtService } from '@nestjs/jwt';
 import { MailerService } from './mailer.service.js';
 import * as crypto from 'crypto';
 import { Otp, OtpDocument } from './schemas/otp.schema.js';
 import { User, UserDocument } from './schemas/user.schema.js';
+
+export interface AuthTokens {
+  accessToken: string;
+  user: {
+    id: string;
+    email: string;
+    role: string;
+  };
+}
 
 @Injectable()
 export class AuthService {
@@ -13,6 +23,7 @@ export class AuthService {
     @InjectModel(Otp.name) private otpModel: Model<OtpDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private mailerService: MailerService,
+    private jwtService: JwtService,
   ) {}
 
   async sendOtp(payload: { email: string }): Promise<{ message: string }> {
@@ -35,7 +46,10 @@ export class AuthService {
     return { message: 'OTP sent successfully' };
   }
 
-  async verifyOtp(payload: { email: string; otp: number }): Promise<{ message: string }> {
+  async verifyOtp(payload: {
+    email: string;
+    otp: number;
+  }): Promise<AuthTokens> {
     const { email, otp } = payload;
 
     if (!email || !otp) {
@@ -70,15 +84,37 @@ export class AuthService {
     // 4. Create user if not exists, otherwise return existing
     //    - New users default to 'student'
     //    - Existing users keep their current role (e.g., librarian)
-    await this.userModel.findOneAndUpdate(
+    const user = await this.userModel.findOneAndUpdate(
       { email: normalizedEmail },
       { $setOnInsert: { email: normalizedEmail, role: 'student' } },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     );
 
-    // 5. (Optional) Issue a JWT here using user._id and user.role
+    if (!user) {
+      throw new UnauthorizedException('Failed to create or retrieve user');
+    }
 
-    return { message: 'OTP verified successfully' };
+    // 5. Issue a JWT access token
+    const accessToken = await this.generateAccessToken(user);
+
+    return {
+      accessToken,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      },
+    };
+  }
+
+  private async generateAccessToken(user: UserDocument): Promise<string> {
+    const payload = {
+      sub: user._id.toString(),
+      email: user.email,
+      role: user.role,
+    };
+
+    return this.jwtService.signAsync(payload);
   }
 
   private hashOtp(otp: number): string {
