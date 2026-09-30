@@ -1,21 +1,11 @@
 // auth.service.ts
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { MailerService } from '../mailer.service.js';
-import { TokenService } from './token.service.js';
 import * as crypto from 'crypto';
 import { Otp, OtpDocument } from '../schemas/otp.schema.js';
 import { User, UserDocument } from '../schemas/user.schema.js';
-
-export interface AuthTokens {
-  accessToken: string;
-  user: {
-    id: string;
-    email: string;
-    role: string;
-  };
-}
+import { MailerService } from '../mailer.service.js';
 
 @Injectable()
 export class AuthService {
@@ -23,8 +13,7 @@ export class AuthService {
     @InjectModel(Otp.name) private otpModel: Model<OtpDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private mailerService: MailerService,
-    private tokenService: TokenService,
-  ) { }
+  ) {}
 
   async sendOtp(payload: { email: string }): Promise<{ message: string }> {
     const email = payload.email.toLowerCase().trim();
@@ -46,10 +35,7 @@ export class AuthService {
     return { message: 'OTP sent successfully' };
   }
 
-  async verifyOtp(payload: {
-    email: string;
-    otp: number;
-  }): Promise<AuthTokens> {
+  async verifyOtp(payload: { email: string; otp: number }): Promise<{ message: string }> {
     const { email, otp } = payload;
 
     if (!email || !otp) {
@@ -84,27 +70,15 @@ export class AuthService {
     // 4. Create user if not exists, otherwise return existing
     //    - New users default to 'student'
     //    - Existing users keep their current role (e.g., librarian)
-    const user = await this.userModel.findOneAndUpdate(
+    await this.userModel.findOneAndUpdate(
       { email: normalizedEmail },
       { $setOnInsert: { email: normalizedEmail, role: 'student' } },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     );
 
-    if (!user) {
-      throw new UnauthorizedException('Failed to create or retrieve user');
-    }
+    // 5. (Optional) Issue a JWT here using user._id and user.role
 
-    // 5. Issue a JWT access token
-    const accessToken = await this.tokenService.generateAccessToken(user);
-
-    return {
-      accessToken,
-      user: {
-        id: user._id.toString(),
-        email: user.email,
-        role: user.role,
-      },
-    };
+    return { message: 'OTP verified successfully' };
   }
 
   private hashOtp(otp: number): string {

@@ -6,8 +6,6 @@ import { AuthService } from '../services/auth.service.js';
 import { MailerService } from '../mailer.service.js';
 import { Otp, OtpSchema } from '../schemas/otp.schema.js';
 import { User, UserSchema } from '../schemas/user.schema.js';
-import { TokenService } from '../services/token.service.js';
-import { AccessTokenModule } from './access-token.module.js';
 
 @Module({
   imports: [
@@ -15,9 +13,8 @@ import { AccessTokenModule } from './access-token.module.js';
       { name: Otp.name, schema: OtpSchema },
       { name: User.name, schema: UserSchema },
     ]),
-    AccessTokenModule, // Import the new AccessTokenModule
   ],
   controllers: [AuthController],
-  providers: [AuthService, MailerService, TokenService],
+  providers: [AuthService, MailerService],
 })
 export class AuthModule { }
