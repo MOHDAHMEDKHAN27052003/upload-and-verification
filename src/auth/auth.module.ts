@@ -2,13 +2,14 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller.js';
-import { AuthService } from './auth.service.js';
+import { AuthService } from './services/auth.service.js';
 import { MailerService } from './mailer.service.js';
 import { Otp, OtpSchema } from './schemas/otp.schema.js';
 import { User, UserSchema } from './schemas/user.schema.js';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StringValue } from 'ms';
+import { TokenService } from './services/token.service.js';
 
 @Module({
   imports: [
@@ -28,6 +29,6 @@ import { StringValue } from 'ms';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, MailerService],
+  providers: [AuthService, MailerService, TokenService],
 })
 export class AuthModule { }

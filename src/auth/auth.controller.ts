@@ -1,12 +1,12 @@
 // auth.controller.ts
 import { Controller, Post, Body, HttpCode } from '@nestjs/common';
-import { AuthService } from './auth.service.js';
+import { AuthService } from './services/auth.service.js';
 import { SendOtpDto } from './dto/send-otp.dto.js';
 import { VerifyOtpDto } from './dto/verify-otp.dto.js';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('send-otp')
   async sendOtp(@Body() sendOtpDto: SendOtpDto) {

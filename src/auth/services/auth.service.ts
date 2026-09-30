@@ -2,11 +2,11 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { JwtService } from '@nestjs/jwt';
-import { MailerService } from './mailer.service.js';
+import { MailerService } from '../mailer.service.js';
+import { TokenService } from './token.service.js';
 import * as crypto from 'crypto';
-import { Otp, OtpDocument } from './schemas/otp.schema.js';
-import { User, UserDocument } from './schemas/user.schema.js';
+import { Otp, OtpDocument } from '../schemas/otp.schema.js';
+import { User, UserDocument } from '../schemas/user.schema.js';
 
 export interface AuthTokens {
   accessToken: string;
@@ -23,8 +23,8 @@ export class AuthService {
     @InjectModel(Otp.name) private otpModel: Model<OtpDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private mailerService: MailerService,
-    private jwtService: JwtService,
-  ) {}
+    private tokenService: TokenService,
+  ) { }
 
   async sendOtp(payload: { email: string }): Promise<{ message: string }> {
     const email = payload.email.toLowerCase().trim();
@@ -95,7 +95,7 @@ export class AuthService {
     }
 
     // 5. Issue a JWT access token
-    const accessToken = await this.generateAccessToken(user);
+    const accessToken = await this.tokenService.generateAccessToken(user);
 
     return {
       accessToken,
@@ -105,16 +105,6 @@ export class AuthService {
         role: user.role,
       },
     };
-  }
-
-  private async generateAccessToken(user: UserDocument): Promise<string> {
-    const payload = {
-      sub: user._id.toString(),
-      email: user.email,
-      role: user.role,
-    };
-
-    return this.jwtService.signAsync(payload);
   }
 
   private hashOtp(otp: number): string {
