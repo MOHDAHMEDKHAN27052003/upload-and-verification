@@ -6,6 +6,13 @@ import * as crypto from 'crypto';
 import { Otp, OtpDocument } from '../schemas/otp.schema.js';
 import { User, UserDocument } from '../schemas/user.schema.js';
 import { MailerService } from '../mailer.service.js';
+import { TokenService } from './token.service.js';
+
+export interface VerifyOtpResponse {
+  message: string;
+  accessToken: string;
+  refreshToken: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -13,6 +20,7 @@ export class AuthService {
     @InjectModel(Otp.name) private otpModel: Model<OtpDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private mailerService: MailerService,
+    private tokenService: TokenService,
   ) {}
 
   async sendOtp(payload: { email: string }): Promise<{ message: string }> {
@@ -35,7 +43,7 @@ export class AuthService {
     return { message: 'OTP sent successfully' };
   }
 
-  async verifyOtp(payload: { email: string; otp: number }): Promise<{ message: string }> {
+  async verifyOtp(payload: { email: string; otp: number }): Promise<VerifyOtpResponse> {
     const { email, otp } = payload;
 
     if (!email || !otp) {
@@ -44,14 +52,11 @@ export class AuthService {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // 1. Find the OTP record
     const record = await this.otpModel.findOne({ email: normalizedEmail });
-
     if (!record) {
       throw new BadRequestException('OTP not found or has expired');
     }
 
-    // 2. Compare hashed OTP
     const hashedInput = this.hashOtp(otp);
     const storedBuf = Buffer.from(record.hashedOtp, 'hex');
     const inputBuf = Buffer.from(hashedInput, 'hex');
@@ -64,28 +69,27 @@ export class AuthService {
       throw new BadRequestException('Invalid OTP');
     }
 
-    // 3. Delete the OTP (single-use)
     await this.otpModel.deleteOne({ _id: record._id });
 
-    // 4. Create user if not exists, otherwise return existing
-    //    - New users default to 'student'
-    //    - Existing users keep their current role (e.g., librarian)
-    await this.userModel.findOneAndUpdate(
+    const user = await this.userModel.findOneAndUpdate(
       { email: normalizedEmail },
       { $setOnInsert: { email: normalizedEmail, role: 'student' } },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     );
 
-    // 5. (Optional) Issue a JWT here using user._id and user.role
+    // Issue tokens
+    const accessToken = this.tokenService.generateAccessToken(user);
+    const refreshToken = this.tokenService.generateRefreshToken(user);
 
-    return { message: 'OTP verified successfully' };
+    return {
+      message: 'OTP verified successfully',
+      accessToken,
+      refreshToken,
+    };
   }
 
   private hashOtp(otp: number): string {
     const secret = process.env.OTP_HASH_SECRET;
-    return crypto
-      .createHmac('sha256', secret!)
-      .update(otp.toString())
-      .digest('hex');
+    return crypto.createHmac('sha256', secret!).update(otp.toString()).digest('hex');
   }
 }
