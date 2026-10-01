@@ -5,7 +5,7 @@ import { Model } from 'mongoose';
 import * as crypto from 'crypto';
 import { Otp, OtpDocument } from '../schemas/otp.schema.js';
 import { User, UserDocument } from '../schemas/user.schema.js';
-import { MailerService } from '../mailer.service.js';
+import { MailerService } from './mailer.service.js';
 import { TokenService } from './token.service.js';
 
 export interface VerifyOtpResponse {
@@ -21,7 +21,7 @@ export class AuthService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private mailerService: MailerService,
     private tokenService: TokenService,
-  ) {}
+  ) { }
 
   async sendOtp(payload: { email: string }): Promise<{ message: string }> {
     const email = payload.email.toLowerCase().trim();

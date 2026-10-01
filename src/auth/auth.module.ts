@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './services/auth.service.js';
-import { MailerService } from './mailer.service.js';
+import { MailerService } from './services/mailer.service.js';
 import { Otp, OtpSchema } from './schemas/otp.schema.js';
 import { User, UserSchema } from './schemas/user.schema.js';
 import { JwtModule } from '@nestjs/jwt';
