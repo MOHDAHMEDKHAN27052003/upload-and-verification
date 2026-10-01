@@ -81,11 +81,36 @@ export class AuthService {
     const accessToken = this.tokenService.generateAccessToken(user);
     const refreshToken = this.tokenService.generateRefreshToken(user);
 
+    // Hash the refresh token before storing
+    const hashedRefreshToken = this.hashToken(refreshToken);
+
+    // Optional: cap the number of stored sessions (e.g., keep last 5)
+    await this.userModel.updateOne(
+      { _id: user._id },
+      {
+        $push: {
+          hashedRefreshTokens: {
+            $each: [hashedRefreshToken],
+            $slice: -5, // keep only the 5 most recent tokens
+          },
+        },
+      },
+    );
+
     return {
       message: 'OTP verified successfully',
       accessToken,
       refreshToken,
     };
+  }
+
+  /**
+   * Hash a token using SHA-256. Refresh tokens are already high-entropy
+   * random strings, so a fast hash (SHA-256) is sufficient and avoids
+   * the cost of bcrypt/argon2 on every request.
+   */
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   private hashOtp(otp: number): string {

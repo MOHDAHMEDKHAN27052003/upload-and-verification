@@ -13,6 +13,9 @@ export class User {
 
   @Prop({ required: true, enum: ['librarian', 'student'], default: 'student' })
   role: UserRole;
+
+  @Prop({ type: [String], default: [] })
+  hashedRefreshTokens: string[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
