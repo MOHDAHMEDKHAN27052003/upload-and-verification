@@ -8,6 +8,8 @@ import { Otp, OtpSchema } from './schemas/otp.schema.js';
 import { User, UserSchema } from './schemas/user.schema.js';
 import { JwtModule } from '@nestjs/jwt';
 import { TokenService } from './services/token.service.js';
+import { JwtStrategy } from './jwt.strategy.js';
+import { PassportModule } from '@nestjs/passport';
 
 @Module({
   imports: [
@@ -16,8 +18,9 @@ import { TokenService } from './services/token.service.js';
       { name: User.name, schema: UserSchema },
     ]),
     JwtModule.register({}),
+    PassportModule
   ],
   controllers: [AuthController],
-  providers: [AuthService, MailerService, TokenService],
+  providers: [AuthService, MailerService, TokenService, JwtStrategy],
 })
 export class AuthModule { }

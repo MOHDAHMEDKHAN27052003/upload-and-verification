@@ -14,7 +14,7 @@ export class User {
   @Prop({ required: true, enum: ['librarian', 'student'], default: 'student' })
   role: UserRole;
 
-  @Prop({ type: [String], default: [] })
+  @Prop({ type: [String], default: [], select: false })
   hashedRefreshTokens: string[];
 }
 
