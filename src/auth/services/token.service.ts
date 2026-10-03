@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
 import express from 'express';
-import { UserDocument } from '../schemas/user.schema.js';
+import { UserDocument } from '../../user/user.schema.js';
 
 @Injectable()
 export class TokenService {
