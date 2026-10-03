@@ -1,14 +1,17 @@
 // auth.controller.ts
-import { Controller, Post, Body, HttpCode } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, Req, UnauthorizedException, Res } from '@nestjs/common';
 import { SendOtpDto } from './dto/send-otp.dto.js';
 import { VerifyOtpDto } from './dto/verify-otp.dto.js';
 import { AuthService } from './services/auth.service.js';
-import { Res } from '@nestjs/common';
+import { TokenService } from './services/token.service.js';
 import express from 'express';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly tokenService: TokenService,
+  ) {}
 
   @Post('send-otp')
   async sendOtp(@Body() sendOtpDto: SendOtpDto) {
@@ -22,24 +25,25 @@ export class AuthController {
     @Res({ passthrough: true }) res: express.Response,
   ) {
     const { accessToken, refreshToken, ...rest } = await this.authService.verifyOtp(dto);
+    this.tokenService.setAuthCookies(res, accessToken, refreshToken);
+    return rest;
+  }
 
-    res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in prod
-      sameSite: 'lax', // or 'strict' / 'none' depending on your frontend/backend domains
-      maxAge: 15 * 60 * 1000, // 15 min — match your access token TTL
-      path: '/',
-    });
+  @Post('refresh')
+  @HttpCode(200)
+  async refresh(
+    @Req() req: express.Request,
+    @Res({ passthrough: true }) res: express.Response,
+  ) {
+    const oldRefreshToken = req.cookies?.refresh_token;
+    if (!oldRefreshToken) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
 
-    // Optionally also set refresh token as a cookie (recommended)
-    res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: '/auth/refresh', // scope it to the refresh endpoint only
-    });
+    const { accessToken, refreshToken } =
+      await this.authService.rotateRefreshToken(oldRefreshToken);
 
-    return rest; // { message: 'OTP verified successfully' }
+    this.tokenService.setAuthCookies(res, accessToken, refreshToken);
+    return { message: 'Token refreshed' };
   }
 }
