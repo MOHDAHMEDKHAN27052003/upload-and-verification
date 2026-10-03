@@ -4,7 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './services/auth.service.js';
 import { MailerService } from './services/mailer.service.js';
-import { Otp, OtpSchema } from './schemas/otp.schema.js';
+import { Otp, OtpSchema } from './otp.schema.js';
 import { User, UserSchema } from '../user/user.schema.js';
 import { JwtModule } from '@nestjs/jwt';
 import { TokenService } from './services/token.service.js';
