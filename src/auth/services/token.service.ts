@@ -46,7 +46,7 @@ export class TokenService {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/auth/refresh',
+      path: '/',
     });
   }
 
@@ -77,5 +77,19 @@ export class TokenService {
     const bufA = Buffer.from(a, 'hex');
     const bufB = Buffer.from(b, 'hex');
     return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+  }
+
+  clearAuthCookies(res: express.Response): void {
+    const baseOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+      path:'/'
+    };
+
+    // Note: path MUST match the path used when setting the cookie,
+    // otherwise the browser treats it as a different cookie.
+    res.clearCookie('access_token', baseOptions );
+    res.clearCookie('refresh_token', baseOptions );
   }
 }

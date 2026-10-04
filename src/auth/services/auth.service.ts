@@ -153,4 +153,33 @@ export class AuthService {
 
     return { accessToken, refreshToken: newRefreshToken };
   }
+
+  async signOut(refreshToken: string | undefined): Promise<{ message: string }> {
+    // If there's no refresh token cookie, there's nothing to invalidate.
+    // (We still return success — sign-out should be idempotent.)
+    if (!refreshToken) {
+      return { message: 'Signed out successfully' };
+    }
+
+    // Verify the JWT so we know which user to update.
+    // If it's invalid/expired, we can't identify the user — but we still
+    // want to clear cookies, so swallow the error.
+    let payload: { sub: string };
+    try {
+      payload = this.tokenService.verifyRefreshToken(refreshToken);
+    } catch {
+      return { message: 'Signed out successfully' };
+    }
+
+    const hashedToken = this.tokenService.hashToken(refreshToken);
+
+    // Remove just THIS session from the user's active refresh tokens.
+    // (Other devices stay logged in.)
+    await this.userModel.updateOne(
+      { _id: payload.sub },
+      { $pull: { hashedRefreshTokens: hashedToken } },
+    );
+
+    return { message: 'Signed out successfully' };
+  }
 }

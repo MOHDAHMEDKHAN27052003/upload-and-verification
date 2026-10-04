@@ -11,7 +11,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly tokenService: TokenService,
-  ) {}
+  ) { }
 
   @Post('send-otp')
   async sendOtp(@Body() sendOtpDto: SendOtpDto) {
@@ -45,5 +45,19 @@ export class AuthController {
 
     this.tokenService.setAuthCookies(res, accessToken, refreshToken);
     return { message: 'Token refreshed' };
+  }
+
+  @Post('signout')
+  @HttpCode(200)
+  async signOut(
+    @Req() req: express.Request,
+    @Res({ passthrough: true }) res: express.Response,
+  ) {
+    const refreshToken = req.cookies?.refresh_token;
+
+    await this.authService.signOut(refreshToken);
+    this.tokenService.clearAuthCookies(res);
+
+    return { message: 'Signed out successfully' };
   }
 }
