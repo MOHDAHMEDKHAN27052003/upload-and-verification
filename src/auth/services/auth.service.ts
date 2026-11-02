@@ -1,5 +1,5 @@
 // auth.service.ts
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as crypto from 'crypto';
@@ -26,18 +26,32 @@ export class AuthService {
   async sendOtp(payload: { email: string }): Promise<{ message: string }> {
     const email = payload.email.toLowerCase().trim();
 
-    // 1. Generate a secure 6-digit OTP
+    const COOLDOWN_SECONDS = 60;
+
+    const existing = await this.otpModel.findOne({ email });
+
+    if (existing) {
+      const secondsSince =
+        (Date.now() - existing.createdAt.getTime()) / 1000;
+
+      if (secondsSince < COOLDOWN_SECONDS) {
+        const retryIn = Math.ceil(COOLDOWN_SECONDS - secondsSince);
+        throw new HttpException(
+          `Please wait ${retryIn} seconds before requesting another OTP`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
     const otp = crypto.randomInt(100000, 999999);
     const hashedOtp = this.tokenService.hashOtp(otp);
 
-    // 2. Save/Update OTP in MongoDB (upsert resets TTL)
     await this.otpModel.findOneAndUpdate(
       { email },
       { email, hashedOtp, createdAt: new Date() },
       { upsert: true, returnDocument: 'after' },
     );
 
-    // 3. Send the email
     await this.mailerService.sendOtpEmail(email, otp);
 
     return { message: 'OTP sent successfully' };
